@@ -229,7 +229,7 @@ def sample(
 
         # Copy is needed to avoid keeping a hanging ref to outputs.logits which may be very large for first iteration
         # (the clone itself is always small)
-        use_cd = model_kwargs.get("images_cd") != None
+        use_cd = model_kwargs.get("images_cd") != None or model_kwargs.get("pixel_values_cd") != None or model_kwargs.get("inputs_embeds_cd") != None
         output_attentions_wo_img = (
             output_attentions if output_attentions is not None else self.generation_config.output_attentions
         )

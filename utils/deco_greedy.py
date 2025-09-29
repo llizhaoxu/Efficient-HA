@@ -252,32 +252,22 @@ def deco_greedy_search(
         )
 
     # keep track of which sequences are already finished
-    batch_size, cur_len = input_ids.shape[:2]
+    batch_size, cur_len = input_ids.shape
     this_peer_finished = False
     unfinished_sequences = torch.ones(batch_size, dtype=torch.long, device=input_ids.device)
-    model_kwargs = self._get_initial_cache_position(cur_len, input_ids.device, model_kwargs)
-
+    model_kwargs = self._get_initial_cache_position(input_ids, model_kwargs)
 
     model_forward = self.__call__
-    compile_forward = self._valid_auto_compile_criteria(model_kwargs, generation_config)
-    if compile_forward:
-        os.environ["TOKENIZERS_PARALLELISM"] = "0"
-        # If we use FA2 and a static cache, we cannot compile with fullgraph
-        if self.config._attn_implementation == "flash_attention_2":
-            # only raise warning if the user passed an explicit compile-config
-            if generation_config.compile_config is not None and generation_config.compile_config.fullgraph:
-                logger.warning_once(
-                    "When using Flash Attention 2 and a static cache, you cannot use the option `CompileConfig(fullgraph=True)` as "
-                    "FA2 introduces graph breaks. We overrode the option with `fullgraph=False`."
-                )
-                generation_config.compile_config.fullgraph = False
-        model_forward = self.get_compiled_call(generation_config.compile_config)
+    if isinstance(model_kwargs.get("past_key_values"), Cache):
+        is_compileable = model_kwargs["past_key_values"].is_compileable and self._supports_static_cache
+        is_compileable = is_compileable and not self.generation_config.disable_compile
+        if is_compileable and (
+            self.device.type == "cuda" or generation_config.compile_config._compile_all_devices
+        ):
+            os.environ["TOKENIZERS_PARALLELISM"] = "0"
+            model_forward = self.get_compiled_call(generation_config.compile_config)
 
-    if generation_config.prefill_chunk_size is not None:
-        model_kwargs = self._prefill_chunking(input_ids, generation_config, **model_kwargs)
-        is_prefill = False
-    else:
-        is_prefill = True
+    is_prefill = True
     lm_head = self.get_output_embeddings()
     if lm_head is None:
         lm_head=self.lm_head
