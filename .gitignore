@@ -1,6 +1,9 @@
 # Byte-compiled / optimized / DLL files
 /data/
 val2014/
+logs
+Result
+.vscode
 datasets/
 result/
 outputs/
