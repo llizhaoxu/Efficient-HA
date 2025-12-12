@@ -498,9 +498,7 @@ def process_json(model, processor, args, output_json):
     if not os.path.exists(output_json):
         with open(output_json, 'w') as f:
             json.dump([], f)
-    if not os.path.exists(args.output_hidden):
-        with open(args.output_hidden, 'w') as f:
-            json.dump([], f)
+
     with open(output_json, 'r') as f:
 
         current_data=json.load(f) 
@@ -568,9 +566,7 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=str,
                         default='/projects/_ssd/ZhaoxuCode/Efficient-HA/hidden_1/output_greedy.json',
                         help='Output file to store model responses')
-    parser.add_argument('--output_hidden', type=str,
-                        default='/projects/_ssd/ZhaoxuCode/Efficient-HA/hidden_1/hidden_greedy.json',
-                        help='Output file to store hidden states')
+
     parser.add_argument('--model_id', type=str, default="OpenGVLab/InternVL3-8B",
                         help='Path to the model')
     

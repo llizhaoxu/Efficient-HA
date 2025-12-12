@@ -553,8 +553,10 @@ def process_json(model, processor, args, output):
 
     total_samples = len(pope_dataset)
     os.makedirs(os.path.dirname(output), exist_ok=True)
-    if not os.path.exists(args.output_caption):
-        with open(args.output_caption, 'w') as f:
+    caption_file = os.path.join(output, "POPE_caption_{}_{}.json".format(args.pope_type,args.method))
+    os.makedirs(os.path.dirname(caption_file), exist_ok=True)
+    if not os.path.exists(caption_file):
+        with open(caption_file, 'w') as f:
             json.dump([], f)
     pred_list, pred_list_s, label_list = [], [], []
 
@@ -571,7 +573,7 @@ def process_json(model, processor, args, output):
 
         torch.cuda.empty_cache()
         pred_list = recorder(response, pred_list)
-        with open(args.output_caption, 'r') as f:
+        with open(caption_file, 'r') as f:
             current_data = json.load(f)
         current_data.append({
             "image_path": image_path,
@@ -579,7 +581,7 @@ def process_json(model, processor, args, output):
             "response": response,
             "label": label[0].item(),
         })
-        with open(args.output_caption, 'w') as f:
+        with open(caption_file, 'w') as f:
             json.dump(current_data, f,indent=4)
 
 
@@ -596,9 +598,7 @@ if __name__ == "__main__":
     parser.add_argument('--output', type=str,
                         default='/projects/_ssd/ZhaoxuCode/Efficient-HA/hidden_10/test',
                         help='Output file to store model responses')
-    parser.add_argument('--output_caption', type=str,
-                        default='/projects/_ssd/ZhaoxuCode/Efficient-HA/hidden_10/test.json',
-                        help='Output file to store model responses')
+
     parser.add_argument("--pope_type", type=str, help="random",default='random', choices=['random', 'popular', 'adversarial'])
     parser.add_argument('--model_id', type=str, default="llava-hf/llava-1.5-7b-hf",
                         help='Path to the model')
