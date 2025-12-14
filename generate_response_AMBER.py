@@ -167,7 +167,7 @@ def get_response(model, processor,args, image_path, question):
                     norm=norm,)
         elif args.method=="dola":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens,    custom_generate="transformers-community/dola",
-    trust_remote_code=True,dola_layers='high', do_sample=False)
+    trust_remote_code=True,dola_layers='high', do_sample=False,repetition_penalty=1.2)
         elif args.method=="beam":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, num_beams=5, do_sample=False)
         elif args.method=="greedy":
@@ -375,7 +375,7 @@ def get_response(model, processor,args, image_path, question):
 
                 
             elif args.method == "dola":
-                generation_config = dict(max_new_tokens=args.max_tokens,custom_generate="transformers-community/dola",dola_layers='high', do_sample=False,repetition_penalty=1.2)
+                generation_config = dict(max_new_tokens=args.max_tokens,custom_generate="transformers-community/dola",dola_layers='high', do_sample=False,repetition_penalty=1.2,trust_remote_code=True)
 
             elif args.method == "deco": 
 
@@ -429,7 +429,7 @@ def get_response(model, processor,args, image_path, question):
                     norm=norm,)
         elif args.method=="dola":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens,    custom_generate="transformers-community/dola",
-    trust_remote_code=True,dola_layers='high', do_sample=False)
+    trust_remote_code=True,dola_layers='high', do_sample=False,repetition_penalty=1.2)
         elif args.method=="beam":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, num_beams=5, do_sample=False)
         elif args.method=="greedy":
@@ -459,7 +459,7 @@ def get_response(model, processor,args, image_path, question):
                     norm=norm,)
         elif args.method=="dola":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens,    custom_generate="transformers-community/dola",
-    trust_remote_code=True,dola_layers='high', do_sample=False)
+    trust_remote_code=True,dola_layers='high', do_sample=False,repetition_penalty=1.2)
         elif args.method=="beam":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, num_beams=5, do_sample=False)
         elif args.method=="greedy":
@@ -474,7 +474,6 @@ def get_response(model, processor,args, image_path, question):
         return output_text
 
     return output_text
-
 
 
 def process_json(model, processor, args, output_json):
