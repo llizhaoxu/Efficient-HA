@@ -532,9 +532,13 @@ if __name__ == "__main__":
     
     parser.add_argument('--datapath', type=str, default="/projects/_hdd/Datazx/MME_Benchmark_release_version/MME_Benchmark",
                         help='Path to the data')
-    parser.add_argument('--method', type=str, default="greedy")
+    parser.add_argument('--method', type=str, default="ours")
     parser.add_argument("--cd_alpha", type=float, default=1)
     parser.add_argument("--cd_beta", type=float, default=0.1)
+    parser.add_argument("--deco_alpha", type=float, default=0.6)
+    parser.add_argument("--deco_top_p", type=float, default=0.9)
+    parser.add_argument("--deco_top_k", type=int, default=20)
+
     parser.add_argument("--noise_step", type=int, default=500)
     parser.add_argument('--device', type=str, default="cuda:0")
     parser.add_argument('--max_tokens', type=int, default=64)
