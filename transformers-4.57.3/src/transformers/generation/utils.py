@@ -2699,7 +2699,7 @@ class GenerationMixin(ContinuousMixin):
         # print("using deco generate")
         # init values
         print("using our method")
-        alpha=generation_config.ours_alpha
+        ours_alpha=generation_config.ours_alpha
         a=generation_config.ours_a
         b=generation_config.ours_b
         top_p=generation_config.ours_top_p
@@ -2882,7 +2882,7 @@ class GenerationMixin(ContinuousMixin):
                 js_d=js_divergence(probs[l], probs[l-1], dim=-1)
                 layer_jsd_mean[l] =js_d  # [1, T]
 
-            score= layer_jsd_mean + interhead_jsd_L + temporal_jsd_L
+            score= a*layer_jsd_mean +b* interhead_jsd_L + c*temporal_jsd_L
 
             if synced_gpus and this_peer_finished:
                 continue  # don't waste resources running the code we don't need
@@ -2925,7 +2925,7 @@ class GenerationMixin(ContinuousMixin):
             next_token_logits = outputs.logits[:, -1, :]
             final_token_logits = (
                 next_token_logits
-                + alpha  * selected_premature_layer_logits
+                + ours_alpha  * selected_premature_layer_logits
             )
             final_token_logits = final_token_logits.masked_fill(
                 indices_to_remove, -float("Inf")
