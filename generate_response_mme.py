@@ -63,7 +63,7 @@ def load_model(model_id,args):
 
         model = AutoModelForVision2Seq.from_pretrained(
         model_id,
-        dtype='bfloat16',
+        dtype='float32',
         trust_remote_code=True,
         device_map=args.device
     )
@@ -166,9 +166,14 @@ def get_response(model, processor,args, image_path, question):
         norm = model.language_model.norm
 
         if args.method == "ours":
-            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+            model.set_attn_implementation('eager')
+            position = {
+                                "image_start": inputs['input_ids'].tolist()[0].index(151652)+1, 
+                                "image_end": inputs['input_ids'].tolist()[0].index(151653)-1, 
+                }
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,ours_alpha=args.ours_alpha,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
@@ -372,7 +377,7 @@ def get_response(model, processor,args, image_path, question):
             question='<image>'+question
             output_text= qianfan_chat(model, processor, pixel_values, question, generation_config)
     elif args.model_id == "OpenGVLab/InternVL3-8B":
-        pixel_values = load_image(image_path, max_num=12).to(torch.bfloat16).to(args.device)
+        pixel_values = load_image(image_path, max_num=6).to(torch.bfloat16).to(args.device)
 
         with torch.no_grad():
             if args.method == "greedy":
@@ -398,8 +403,9 @@ def get_response(model, processor,args, image_path, question):
             elif args.method == "ours":
                 lm_head = model.language_model.lm_head
                 norm = model.language_model.model.norm
-                
-                generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+                model.set_attn_implementation('eager')
+
+                generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
                     norm=norm,)
             question='<image>\n'+question
@@ -428,9 +434,14 @@ def get_response(model, processor,args, image_path, question):
         lm_head = model.lm_head
         norm = model.language_model.norm
         if args.method == "ours":
-            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+            model.set_attn_implementation('eager')
+            position = {
+                                        "image_start": inputs['input_ids'].tolist()[0].index(32000), 
+                                        "image_end": inputs['input_ids'].tolist()[0].index(32000)+24*24, 
+                                    }
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
@@ -458,9 +469,14 @@ def get_response(model, processor,args, image_path, question):
         lm_head = model.language_model.lm_head
         norm = model.language_model.model.norm
         if args.method == "ours":
-            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+            model.set_attn_implementation('eager')
+            position = {
+                            "image_start": 0, 
+                            "image_end": 31, 
+            }
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
@@ -486,9 +502,10 @@ def get_response(model, processor,args, image_path, question):
 
 
 
+
 def process_json(model, processor, args, output_json):
     image_ids = []
-    questions = [json.loads(q) for q in open(os.path.expanduser('/projects/_ssd/ZhaoxuCode/Efficient-HA/pope_coco/llava-1.5-mme-deco-a02-15-20.jsonl'), "r")]
+    questions = [json.loads(q) for q in open(os.path.expanduser('/projects/ChenqiDataSSD/ZXCode/Efficient-HA/pope_coco/llava-1.5-mme-deco-a02-15-20.jsonl'), "r")]
 
 
     total_samples = len(image_ids)
@@ -526,12 +543,12 @@ def process_json(model, processor, args, output_json):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str,
-                        default='/projects/_ssd/ZhaoxuCode/Efficient-HA/hidden_10/test.json',
+                        default='/projects/ChenqiDataSSD/ZXCode/Efficient-HA/hidden_10/test.json',
                         help='Output file to store model responses')
     parser.add_argument('--model_id', type=str, default="llava-hf/llava-1.5-7b-hf",
                         help='Path to the model')
     
-    parser.add_argument('--datapath', type=str, default="/projects/_hdd/Datazx/MME_Benchmark_release_version/MME_Benchmark",
+    parser.add_argument('--datapath', type=str, default="/projects/ChenqiDataSSD/ZXCode/MME_Benchmark_release_version/MME_Benchmark",
                         help='Path to the data')
     parser.add_argument('--method', type=str, default="ours")
     parser.add_argument("--cd_alpha", type=float, default=1)
@@ -550,8 +567,16 @@ if __name__ == "__main__":
     parser.add_argument("--ours_top_p", type=float, default=0.9)
     parser.add_argument('--start_layer', type=int, default=18)
     parser.add_argument('--end_layer', type=int, default=26)
+    parser.add_argument('--save_args', action='store_true', help='Whether to save args to a json file')
     args = parser.parse_args()
 
+    if args.save_args:
+        save_args_path = os.path.splitext(args.output)[0] + "_args.json"
+        if not os.path.exists(os.path.dirname(save_args_path)):
+            os.makedirs(os.path.dirname(save_args_path), exist_ok=True)
+        with open(save_args_path, 'w') as f:
+            json.dump(vars(args), f, indent=2)
+        print(f"Arguments saved to {save_args_path}")
     model, processor = load_model(args.model_id,args)
 
     process_json(model, processor,args, args.output)
