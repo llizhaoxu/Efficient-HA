@@ -2711,6 +2711,7 @@ class GenerationMixin(ContinuousMixin):
         output_scores = generation_config.output_scores
         output_logits = generation_config.output_logits
         return_dict_in_generate = generation_config.return_dict_in_generate
+        position=generation_config.position
         has_eos_stopping_criteria = any(
             hasattr(criteria, "eos_token_id") for criteria in stopping_criteria
         )
@@ -2773,6 +2774,43 @@ class GenerationMixin(ContinuousMixin):
             is_prefill = False
         else:
             is_prefill = True
+        img_start=position['image_start']
+        img_end=position['image_end']
+        EPS = 1e-8
+
+        def _normalize_prob(p: torch.Tensor, dim: int = -1) -> torch.Tensor:
+            p = p.clamp_min(EPS)
+            return p / p.sum(dim=dim, keepdim=True).clamp_min(EPS)
+
+        def js_divergence(p: torch.Tensor, q: torch.Tensor, dim: int = -1) -> torch.Tensor:
+            """
+            p,q: [..., N] (nonnegative, will normalize)
+            return: [...]  (JSD)
+            """
+            p = _normalize_prob(p, dim=dim)
+            q = _normalize_prob(q, dim=dim)
+            m = 0.5 * (p + q)
+            kl_pm = (p * (p / m).log()).sum(dim=dim)
+            kl_qm = (q * (q / m).log()).sum(dim=dim)
+            return 0.5 * (kl_pm + kl_qm)
+
+        def mean_pairwise_jsd_over_heads(attn_l: torch.Tensor) -> torch.Tensor:
+            """
+            attn_l: [H, N]
+            return: scalar, mean pairwise JSD among heads
+            """
+            H = attn_l.size(0)
+            if H <= 1:
+                return attn_l.new_zeros(())
+            p = attn_l.unsqueeze(1)  # [H,1,N]
+            q = attn_l.unsqueeze(0)  # [1,H,N]
+            js = js_divergence(p, q, dim=-1)  # [H,H]
+            idx = torch.triu_indices(H, H, offset=1, device=attn_l.device)
+            return js[idx[0], idx[1]].mean()
+
+        # === 缓存上一时刻的 attention，用于 temporal jsd ===
+        # store as [L, H, img_len]
+        prev_attn_LHN = None
 
         while self._has_unfinished_sequences(
             this_peer_finished, synced_gpus, device=input_ids.device
@@ -2785,13 +2823,22 @@ class GenerationMixin(ContinuousMixin):
 
             if is_prefill:
                 outputs = self(
-                    **model_inputs, return_dict=True, output_hidden_states=True
+                    **model_inputs, return_dict=True, output_hidden_states=True,output_attentions=True
                 )
                 is_prefill = False
+                multi_head_attentions = torch.stack(outputs.attentions)  # [layers, batch_size=1, num_heads, seq_len, seq_len]
+                multi_head_attentions = torch.cat([
+                    multi_head_attentions[:, :, :, :img_start, img_start:img_end],
+                    multi_head_attentions[:, :, :, img_end:,  img_start:img_end],
+
+                ], dim=3)  # [layers, batch_size=1, num_heads, seq_len, img_len]
+                #[layers, batch_size=1, num_heads, 1, seq_len]
+                multi_head_attentions = multi_head_attentions.mean(dim=3,keepdim=True)  # [layers, batch_size=1, num_heads, 1, img_len]
             else:
                 outputs = model_forward(
-                    **model_inputs, return_dict=True, output_hidden_states=True
+                    **model_inputs, return_dict=True, output_hidden_states=True,output_attentions=True
                 )
+                multi_head_attentions = torch.stack(outputs.attentions)[:, :, :, :, img_start:img_end]  # [layers, batch_size=1, num_heads, 1, seq_len]
 
             # synced_gpus: don't waste resources running the code we don't need; kwargs must be updated before skipping
             model_kwargs = self._update_model_kwargs_for_generation(
@@ -2801,7 +2848,17 @@ class GenerationMixin(ContinuousMixin):
             )
             if synced_gpus and this_peer_finished:
                 continue
-
+            attn_LHN = multi_head_attentions.squeeze(1).squeeze(2)  # [L, H, img_len]
+            attn_LHN = _normalize_prob(attn_LHN, dim=-1)
+            L, H, N = attn_LHN.shape
+            if prev_attn_LHN is None:
+                temporal_jsd_L = torch.zeros(L+1, dtype=attn_LHN.dtype, device=attn_LHN.device)
+            else:
+                curr = attn_LHN.view(L, -1)       # [L, H*img_len]
+                prev = prev_attn_LHN.view(L, -1)  # [L, H*img_len]
+                temporal_jsd_L = js_divergence(curr, prev, dim=-1)
+                temporal_jsd_L = torch.cat([torch.zeros(1, dtype=attn_LHN.dtype, device=attn_LHN.device), temporal_jsd_L], dim=0)  # [L+1] 
+            prev_attn_LHN = attn_LHN.clone()
             last_layer_tokens_logits = outputs.logits[:, -1, :]
             
             lm_head = lm_head
@@ -2809,32 +2866,19 @@ class GenerationMixin(ContinuousMixin):
     
             logits = torch.stack(outputs.hidden_states)  # [layers, batch_size=1, hidden_size]
             logits = lm_head(norm(logits))
-            probs  = torch.softmax(logits[:, :, -1, :], dim=-1).detach().cpu()  # [layers, 1, vocab_size]
+            probs  = torch.softmax(logits[:, :, -1, :], dim=-1)# [layers, 1, vocab_size]
             T = probs.size(1)     # seq_len
             V = probs.size(2)     # vocab_size
             m = probs.size(0)     # layers
-            # 保存此 token 的各层平均 JSD（前后层平均）
-            layer_jsd_mean = []
+            layer_jsd_mean = torch.zeros(m, dtype=probs.dtype, device=probs.device)  # [layers]
+            interhead_jsd_L =torch.zeros(m, dtype=probs.dtype, device=probs.device)  # [layers]
+            for l in range(1, m):
 
-            # 3) 从第二层到倒数第二层：l=1 → m-2
-            for l in range(1, m - 1):
-                curr = np.array(probs[l].squeeze().detach().to(torch.float).cpu().numpy())        # [1, T, V]
-                prev = np.array(probs[l - 1].squeeze().detach().to(torch.float).cpu().numpy())   # [1, T, V]
+                interhead_jsd_L[l] = mean_pairwise_jsd_over_heads(attn_LHN[l-1])
+                js_d=js_divergence(probs[l], probs[l-1], dim=-1)
+                layer_jsd_mean[l] =js_d  # [1, T]
 
-                js_dist = jensenshannon(curr, prev, base=2)  # base=2 用 log2
-                # [1, T]
-                # jsd_next = jsd_batch(curr, nxt)    # [1, T]
-                jsd_mean =js_dist  # [1, T]
-    # [1, T]
-
-                layer_jsd_mean.append(jsd_mean.squeeze(0))  # [T]
-
-            # 保存此 token 所有层的 JSD
-            layer_jsd_mean=torch.tensor(layer_jsd_mean).detach().cpu()
-            # for candidate_premature_layer in early_exit_layers:
-            #     dict_outputs[candidate_premature_layer] = lm_head(
-            #         norm(outputs.hidden_states[candidate_premature_layer])
-            #     ).to(last_layer_tokens_logits.device)
+            score= layer_jsd_mean + interhead_jsd_L + temporal_jsd_L
 
             if synced_gpus and this_peer_finished:
                 continue  # don't waste resources running the code we don't need
@@ -2856,11 +2900,11 @@ class GenerationMixin(ContinuousMixin):
             )
             candidate_tokens_ids = candidate_tokens_ids[:candidate_tokens_cutoff_idx]
 
-            mask = torch.zeros_like(layer_jsd_mean, dtype=bool)
+            mask = torch.zeros_like(score, dtype=bool)
             mask[early_exit_layers] = True
 
             # 2. 选出 mask 对应的 tensor 部分
-            t_selected = layer_jsd_mean[mask]
+            t_selected = score[mask]
 
             # 3. 找出最小值及其在原 tensor 中的索引
             min_val, min_pos = torch.min(t_selected, dim=0)

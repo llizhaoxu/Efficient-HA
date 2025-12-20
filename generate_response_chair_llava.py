@@ -63,7 +63,7 @@ def load_model(model_id,args):
 
         model = AutoModelForVision2Seq.from_pretrained(
         model_id,
-        dtype='bfloat16',
+        dtype='float32',
         trust_remote_code=True,
         device_map=args.device
     )
@@ -166,9 +166,14 @@ def get_response(model, processor,args, image_path, question):
         norm = model.language_model.norm
 
         if args.method == "ours":
+            model.set_attn_implementation('eager')
+            position = {
+                                "image_start": inputs['input_ids'].tolist()[0].index(151652)+1, 
+                                "image_end": inputs['input_ids'].tolist()[0].index(151653)-1, 
+                }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
@@ -372,7 +377,7 @@ def get_response(model, processor,args, image_path, question):
             question='<image>'+question
             output_text= qianfan_chat(model, processor, pixel_values, question, generation_config)
     elif args.model_id == "OpenGVLab/InternVL3-8B":
-        pixel_values = load_image(image_path, max_num=12).to(torch.bfloat16).to(args.device)
+        pixel_values = load_image(image_path, max_num=6).to(torch.bfloat16).to(args.device)
 
         with torch.no_grad():
             if args.method == "greedy":
@@ -398,10 +403,11 @@ def get_response(model, processor,args, image_path, question):
             elif args.method == "ours":
                 lm_head = model.language_model.lm_head
                 norm = model.language_model.model.norm
-                
+                model.set_attn_implementation('eager')
+
                 generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm)
             question='<image>\n'+question
             output_text= chat(model, processor, pixel_values, question, generation_config)
 
@@ -428,9 +434,14 @@ def get_response(model, processor,args, image_path, question):
         lm_head = model.lm_head
         norm = model.language_model.norm
         if args.method == "ours":
+            model.set_attn_implementation('eager')
+            position = {
+                                        "image_start": inputs['input_ids'].tolist()[0].index(32000), 
+                                        "image_end": inputs['input_ids'].tolist()[0].index(32000)+24*24, 
+                                    }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
@@ -458,9 +469,14 @@ def get_response(model, processor,args, image_path, question):
         lm_head = model.language_model.lm_head
         norm = model.language_model.model.norm
         if args.method == "ours":
+            model.set_attn_implementation('eager')
+            position = {
+                            "image_start": 0, 
+                            "image_end": 31, 
+            }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
@@ -567,7 +583,7 @@ if __name__ == "__main__":
                         default='/projects/_ssd/ZhaoxuCode/Efficient-HA/hidden_1/output_greedy.json',
                         help='Output file to store model responses')
 
-    parser.add_argument('--model_id', type=str, default="OpenGVLab/InternVL3-8B",
+    parser.add_argument('--model_id', type=str, default="Qwen/Qwen2.5-VL-7B-Instruct",
                         help='Path to the model')
     
     parser.add_argument('--datapath', type=str, default="/projects/_hdd/Datazx/coco_val_images/val2014",

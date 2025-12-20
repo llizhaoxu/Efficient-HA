@@ -639,12 +639,18 @@ def chat(model, tokenizer, pixel_values, question, generation_config, history=No
 
     model_inputs = tokenizer(query, return_tensors='pt')
     input_ids = model_inputs['input_ids'].to(model.device)
+
+    position = {
+                                "image_start": input_ids.tolist()[0].index(151665)+1, 
+                                "image_end": input_ids.tolist()[0].index(151666)-1, 
+                }
     attention_mask = model_inputs['attention_mask'].to(model.device)
     generation_config['eos_token_id'] = eos_token_id
     generation_output = model.generate(
         pixel_values=pixel_values,
         input_ids=input_ids,
         attention_mask=attention_mask,
+        position=position,
         **generation_config
     )
     if generation_config.get('return_dict_in_generate', False):

@@ -353,7 +353,7 @@ class GenerationConfig(PushToHubMixin):
 
         self.return_legacy_cache = kwargs.pop("return_legacy_cache", None)
         self.prefill_chunk_size = kwargs.pop("prefill_chunk_size", None)
-
+        
         # Parameters for manipulation of the model output logits
         self.temperature = kwargs.pop("temperature", 1.0)
         self.top_k = kwargs.pop("top_k", 50)
@@ -385,6 +385,7 @@ class GenerationConfig(PushToHubMixin):
         self.norm=kwargs.pop("norm", None)
         self.use_ours=kwargs.pop("use_ours", False)
         self.use_deco=kwargs.pop("use_deco", False)
+        self.position=kwargs.pop("position", None)
         watermarking_config = kwargs.pop("watermarking_config", None)
         if watermarking_config is None:
             self.watermarking_config = None
