@@ -503,7 +503,7 @@ def get_response(model, processor,args, image_path, question):
 
 def process_json(model, processor, args, output_json):
     image_ids = []
-    with open('/projects/ChenqiDataSSD/ZXCode/Efficient-HA/opera_log/llava-1.5/greedy.jsonl', "r", encoding="utf-8") as f:
+    with open(args.question_path, "r", encoding="utf-8") as f:
             for line in f.readlines():
                 json_data = json.loads(line)
                 json_data.pop('caption')
@@ -587,7 +587,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--model_id', type=str, default="Qwen/Qwen2.5-VL-7B-Instruct",
                         help='Path to the model')
-    
+    parser.add_argument('--question_path', type=str, default="/projects/ChenqiDataSSD/ZXCode/Efficient-HA/opera_log/llava-1.5/greedy.jsonl",
+                        help='Path to the question file')
     parser.add_argument('--datapath', type=str, default="/projects/ChenqiDataSSD/ZXCode/val2014",
                         help='Path to the data')
     parser.add_argument('--method', type=str, default="ours")

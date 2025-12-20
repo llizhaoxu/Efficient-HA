@@ -497,7 +497,7 @@ def get_response(model, processor,args, image_path, question):
 
 def process_json(model, processor, args, output_json):
 
-    with open('/projects/ChenqiDataSSD/ZXCode/Efficient-HA/AMBER/data/query/query_all.json', "r", encoding="utf-8") as f:
+    with open(args.question_path, "r", encoding="utf-8") as f:
         json_data = json.load(f) 
 
 
@@ -543,7 +543,8 @@ if __name__ == "__main__":
                         help='Output file to store model responses')
     parser.add_argument('--model_id', type=str, default="llava-hf/llava-1.5-7b-hf",
                         help='Path to the model')
-    
+    parser.add_argument('--question_path', type=str, default="/projects/ChenqiDataSSD/ZXCode/Efficient-HA/AMBER/data/query/query_all.json",
+                        help='Path to the question file')
     parser.add_argument('--datapath', type=str, default="/projects/ChenqiDataSSD/ZXCode/image",
                         help='Path to the data')
     parser.add_argument('--method', type=str, default="ours")

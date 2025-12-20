@@ -505,7 +505,7 @@ def get_response(model, processor,args, image_path, question):
 
 def process_json(model, processor, args, output_json):
     image_ids = []
-    questions = [json.loads(q) for q in open(os.path.expanduser('/projects/ChenqiDataSSD/ZXCode/Efficient-HA/pope_coco/llava-1.5-mme-deco-a02-15-20.jsonl'), "r")]
+    questions = [json.loads(q) for q in open(os.path.expanduser(args.question_path), "r")]
 
 
     total_samples = len(image_ids)
@@ -547,7 +547,8 @@ if __name__ == "__main__":
                         help='Output file to store model responses')
     parser.add_argument('--model_id', type=str, default="llava-hf/llava-1.5-7b-hf",
                         help='Path to the model')
-    
+    parser.add_argument('--question_path', type=str, default="/projects/ChenqiDataSSD/ZXCode/Efficient-HA/pope_coco/llava-1.5-mme-deco-a02-15-20.jsonl",
+                        help='Path to the question file')
     parser.add_argument('--datapath', type=str, default="/projects/ChenqiDataSSD/ZXCode/MME_Benchmark_release_version/MME_Benchmark",
                         help='Path to the data')
     parser.add_argument('--method', type=str, default="ours")
