@@ -385,6 +385,11 @@ class GenerationConfig(PushToHubMixin):
         self.norm=kwargs.pop("norm", None)
         self.use_ours=kwargs.pop("use_ours", False)
         self.use_deco=kwargs.pop("use_deco", False)
+        self.ours_alpha=kwargs.pop("ours_alpha", None)
+        self.ours_a=kwargs.pop("ours_a", None)
+        self.ours_b=kwargs.pop("ours_b", None)
+        self.ours_c=kwargs.pop("ours_c", None)
+        self.ours_top_p=kwargs.pop("ours_top_p", None)
         self.position=kwargs.pop("position", None)
         watermarking_config = kwargs.pop("watermarking_config", None)
         if watermarking_config is None:

@@ -2699,7 +2699,11 @@ class GenerationMixin(ContinuousMixin):
         # print("using deco generate")
         # init values
         print("using our method")
-        alpha=generation_config.alpha
+        alpha=generation_config.ours_alpha
+        a=generation_config.ours_a
+        b=generation_config.ours_b
+        top_p=generation_config.ours_top_p
+        c=generation_config.ours_c
         threshold_top_p=generation_config.threshold_top_p
         threshold_top_k=generation_config.threshold_top_k
         early_exit_layers=generation_config.early_exit_layers

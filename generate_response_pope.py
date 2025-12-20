@@ -220,8 +220,8 @@ def get_response(model, processor,args, image_path, question):
         norm = model.language_model.norm
 
         if args.method == "ours":
-            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
-                                                early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+                                                early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
                     norm=norm,)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
@@ -453,8 +453,8 @@ def get_response(model, processor,args, image_path, question):
                 lm_head = model.language_model.lm_head
                 norm = model.language_model.model.norm
                 
-                generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
-                                                early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
+                generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+                                                early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
                     norm=norm,)
             question='<image>\n'+question
             output_text= chat(model, processor, pixel_values, question, generation_config)
@@ -482,8 +482,8 @@ def get_response(model, processor,args, image_path, question):
         lm_head = model.lm_head
         norm = model.language_model.norm
         if args.method == "ours":
-            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
-                                                early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+                                                early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
                     norm=norm,)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
@@ -512,8 +512,8 @@ def get_response(model, processor,args, image_path, question):
         lm_head = model.language_model.lm_head
         norm = model.language_model.model.norm
         if args.method == "ours":
-            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
-                                                early_exit_layers=[i for i in range(18,26)], lm_head=lm_head,
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,alpha=args.ours_alpha, threshold_top_p=args.ours_top_p, threshold_top_k=args.ours_top_k,
+                                                early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
                     norm=norm,)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
@@ -616,6 +616,13 @@ if __name__ == "__main__":
     parser.add_argument("--noise_step", type=int, default=500)
     parser.add_argument('--device', type=str, default="cuda:0")
     parser.add_argument('--max_tokens', type=int, default=10)
+    parser.add_argument("--ours_alpha", type=float, default=0.6)
+    parser.add_argument("--ours_a", type=float, default=1)
+    parser.add_argument("--ours_b", type=float, default=1)
+    parser.add_argument("--ours_c", type=float, default=1)
+    parser.add_argument("--ours_top_p", type=float, default=0.9)
+    parser.add_argument('--start_layer', type=int, default=18)
+    parser.add_argument('--end_layer', type=int, default=26)
     args = parser.parse_args()
 
     model, processor = load_model(args.model_id,args)
