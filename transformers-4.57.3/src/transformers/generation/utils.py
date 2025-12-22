@@ -16,6 +16,7 @@
 import copy
 import inspect
 import os
+import math
 import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union,List
@@ -2812,10 +2813,59 @@ class GenerationMixin(ContinuousMixin):
             idx = torch.triu_indices(H, H, offset=1, device=attn_l.device)
             return js[idx[0], idx[1]].mean()
 
-        # === 缓存上一时刻的 attention，用于 temporal jsd ===
-        # store as [L, H, img_len]
-        prev_attn_LHN = None
+        def topk_mean_pairwise_jsd(attn_l: torch.Tensor, k: int) -> torch.Tensor:
+            """
+            attn_l: [H, N]   (某层所有 head 对 image tokens 的注意力)
+            k: 选多少个 head 再计算两两 JSD
+            
+            返回: 标量（Top-k head 之间的 mean pairwise JSD）
+            """
+            H, N = attn_l.shape
+            if H <= 1:
+                return attn_l.new_zeros(())
 
+            # ---- 归一化（概率）----
+            p = _normalize_prob(attn_l, dim=-1)  # [H, N]
+
+            # ---- 1) 强度（最大注意力）----
+            strength = p.max(dim=-1).values  # [H]
+
+            # ---- 2) 集中度（1 - normalized entropy）----
+            entropy = -(p * p.clamp_min(EPS).log()).sum(dim=-1)
+            entropy_norm = entropy / math.log(N + 1e-8)
+            compactness = 1.0 - entropy_norm  # [H]
+
+            # ---- 3) soft-IoU（与所有 head 的平均 soft-IoU）----
+            #  Soft IoU = sum(min)/sum(max)
+            p_exp = p.unsqueeze(1)  # [H,1,N]
+            q_exp = p.unsqueeze(0)  # [1,H,N]
+            inter = torch.min(p_exp, q_exp).sum(dim=-1)     # [H,H]
+            union = torch.max(p_exp, q_exp).sum(dim=-1).clamp_min(EPS)  # [H,H]
+            sIoU = inter / union  # [H,H]
+
+            # 忽略自己和自己
+            idx = torch.arange(H, device=attn_l.device)
+            sIoU = sIoU.masked_fill(idx.unsqueeze(0) == idx.unsqueeze(1), 0.0)
+
+            # 平均 soft-IoU（衡量 head 与“主流 pattern”一致程度）
+            avg_sIoU = sIoU.sum(dim=-1) / (H - 1)  # [H]
+
+            # ---- 4) 综合得分（越大越好）----
+            score = strength + compactness + avg_sIoU
+
+            # ---- 5) 选 Top-k head ----
+            k_eff = min(k, H)
+            _, topk_idx = torch.topk(score, k_eff)
+
+            topk_attn = p[topk_idx]  # [k_eff, N]
+
+            # ---- 6) 在 Top-k head 间做 mean pairwise JSD ----
+            return mean_pairwise_jsd_over_heads(topk_attn)
+        prev_attn_LHN = None
+        if model_kwargs.get("output_attentions") is not None:
+            model_kwargs.pop("output_attentions")
+        if model_kwargs.get("output_hidden_states") is not None:
+            model_kwargs.pop("output_hidden_states")
         while self._has_unfinished_sequences(
             this_peer_finished, synced_gpus, device=input_ids.device
         ):
@@ -2878,7 +2928,7 @@ class GenerationMixin(ContinuousMixin):
             interhead_jsd_L =torch.zeros(m, dtype=probs.dtype, device=probs.device)  # [layers]
             for l in range(1, m):
 
-                interhead_jsd_L[l] = mean_pairwise_jsd_over_heads(attn_LHN[l-1])
+                interhead_jsd_L[l] = topk_mean_pairwise_jsd(attn_LHN[l-1],k=top_p)
                 js_d=js_divergence(probs[l], probs[l-1], dim=-1)
                 layer_jsd_mean[l] =js_d  # [1, T]
 
