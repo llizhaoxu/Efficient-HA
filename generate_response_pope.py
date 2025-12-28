@@ -217,9 +217,9 @@ def get_response(model, processor,args, image_path, question):
 
         lm_head = model.lm_head
         norm = model.language_model.norm
-
+        model.set_attn_implementation('eager')
         if args.method == "ours":
-            model.set_attn_implementation('eager')
+
             position = {
                                 "image_start": inputs['input_ids'].tolist()[0].index(151652)+1, 
                                 "image_end": inputs['input_ids'].tolist()[0].index(151653)-1, 
@@ -431,7 +431,7 @@ def get_response(model, processor,args, image_path, question):
             output_text= qianfan_chat(model, processor, pixel_values, question, generation_config)
     elif args.model_id == "OpenGVLab/InternVL3-8B":
         pixel_values = load_image(image_path, max_num=6).to(torch.bfloat16).to(args.device)
-
+        model.set_attn_implementation('eager')
         with torch.no_grad():
             if args.method == "greedy":
                 generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False)
@@ -456,7 +456,7 @@ def get_response(model, processor,args, image_path, question):
             elif args.method == "ours":
                 lm_head = model.language_model.lm_head
                 norm = model.language_model.model.norm
-                model.set_attn_implementation('eager')
+
 
                 generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
@@ -486,8 +486,9 @@ def get_response(model, processor,args, image_path, question):
         ).to(model.device)
         lm_head = model.lm_head
         norm = model.language_model.norm
+        model.set_attn_implementation('eager')
         if args.method == "ours":
-            model.set_attn_implementation('eager')
+
             position = {
                                         "image_start": inputs['input_ids'].tolist()[0].index(32000), 
                                         "image_end": inputs['input_ids'].tolist()[0].index(32000)+24*24, 
@@ -521,8 +522,9 @@ def get_response(model, processor,args, image_path, question):
 
         lm_head = model.language_model.lm_head
         norm = model.language_model.model.norm
+        model.set_attn_implementation('eager')
         if args.method == "ours":
-            model.set_attn_implementation('eager')
+            
             position = {
                             "image_start": 0, 
                             "image_end": 31, 
