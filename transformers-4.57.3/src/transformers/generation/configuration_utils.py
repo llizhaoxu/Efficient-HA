@@ -74,6 +74,7 @@ class GenerationMode(ExplicitEnum):
     DOLA_GENERATION = "dola_generation"
     OURS = "ours"
     DECO = "deco"
+    SAVER = "saver"
     # Beam methods
     BEAM_SEARCH = "beam_search"
     BEAM_SAMPLE = "beam_sample"
@@ -391,6 +392,11 @@ class GenerationConfig(PushToHubMixin):
         self.ours_c=kwargs.pop("ours_c", None)
         self.ours_top_p=kwargs.pop("ours_top_p", None)
         self.position=kwargs.pop("position", None)
+        self.use_saver=kwargs.pop("use_saver", False)
+        self.saver_threshold_top_k_small=kwargs.pop("saver_threshold_top_k_small", None)
+        self.saver_threshold_top_p=kwargs.pop("saver_threshold_top_p", None)
+        self.saver_alpha=kwargs.pop("saver_alpha", None)
+        self.saver_threshold_top_k=kwargs.pop("saver_threshold_top_k", None)
         watermarking_config = kwargs.pop("watermarking_config", None)
         if watermarking_config is None:
             self.watermarking_config = None
@@ -505,6 +511,7 @@ class GenerationConfig(PushToHubMixin):
                         generation_mode = GenerationMode.OURS
                     elif self.use_deco==True:
                         generation_mode = GenerationMode.DECO
+
                     else:
                         generation_mode = GenerationMode.GREEDY_SEARCH
             else:
@@ -516,7 +523,10 @@ class GenerationConfig(PushToHubMixin):
             elif self.do_sample is True:
                 generation_mode = GenerationMode.BEAM_SAMPLE
             else:
-                generation_mode = GenerationMode.BEAM_SEARCH
+                if self.use_saver==True:
+                    generation_mode = GenerationMode.SAVER
+                else:
+                    generation_mode = GenerationMode.BEAM_SEARCH
 
         # Assisted generation may extend some generation modes
         if (

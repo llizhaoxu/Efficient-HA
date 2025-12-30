@@ -173,6 +173,15 @@ def get_response(model, processor,args, image_path, question):
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,ours_alpha=args.ours_alpha,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
                     norm=norm, position=position)
+        if args.method == "saver":
+
+            position = {
+                                "image_start": inputs['input_ids'].tolist()[0].index(151652)+1, 
+                                "image_end": inputs['input_ids'].tolist()[0].index(151653)-1, 
+                }
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, num_beams=2, do_sample=False, use_saver=True, saver_threshold_top_p=args.deco_top_p, saver_threshold_top_k=args.deco_top_k, saver_alpha=args.deco_alpha,saver_threshold_top_k_small=50,
+                                                early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
+                    norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
                                                 early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
@@ -407,6 +416,14 @@ def get_response(model, processor,args, image_path, question):
                 generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
                     norm=norm,)
+            elif args.method == "saver":
+                lm_head = model.language_model.lm_head
+                norm = model.language_model.model.norm
+
+
+                generation_config = dict( max_new_tokens=args.max_tokens,num_beams=2, do_sample=False, use_saver=True, saver_threshold_top_p=args.deco_top_p, saver_threshold_top_k=args.deco_top_k, saver_alpha=args.deco_alpha,saver_threshold_top_k_small=50,
+                                                early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
+                    norm=norm)    
             question='<image>\n'+question
             output_text= chat(model, processor, pixel_values, question, generation_config)
 
@@ -441,6 +458,15 @@ def get_response(model, processor,args, image_path, question):
                                     }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
+                    norm=norm, position=position)
+        elif args.method == "saver":
+
+            position = {
+                                        "image_start": inputs['input_ids'].tolist()[0].index(32000), 
+                                        "image_end": inputs['input_ids'].tolist()[0].index(32000)+24*24, 
+                                    }
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens,num_beams=2, do_sample=False, use_saver=True, saver_threshold_top_p=args.deco_top_p, saver_threshold_top_k=args.deco_top_k, saver_alpha=args.deco_alpha,saver_threshold_top_k_small=50,
+                                                early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
                     norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
@@ -477,6 +503,15 @@ def get_response(model, processor,args, image_path, question):
             }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
+                    norm=norm, position=position)
+        elif args.method == "saver":
+            
+            position = {
+                            "image_start": 0, 
+                            "image_end": 31, 
+            }
+            outputs = model.generate(**inputs, max_new_tokens=args.max_tokens,num_beams=2, do_sample=False, use_saver=True, saver_threshold_top_p=args.deco_top_p, saver_threshold_top_k=args.deco_top_k, saver_alpha=args.deco_alpha,saver_threshold_top_k_small=50,
+                                                early_exit_layers=[i for i in range(20,29)], lm_head=lm_head,
                     norm=norm, position=position)
         elif args.method=="deco":
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_deco=True, alpha=args.deco_alpha, threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,
@@ -584,16 +619,16 @@ def process_json(model, processor, args, output_json):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=str,
-                        default='/projects/ChenqiDataSSD/ZXCode/Efficient-HA/hidden_1/output_greedy.json',
+                        default='/projects/_ssd/ZhaoxuCode/Efficient-HA/hidden_1/output_greedy.json',
                         help='Output file to store model responses')
 
     parser.add_argument('--model_id', type=str, default="Qwen/Qwen2.5-VL-7B-Instruct",
                         help='Path to the model')
-    parser.add_argument('--question_path', type=str, default="/projects/ChenqiDataSSD/ZXCode/Efficient-HA/opera_log/llava-1.5/greedy.jsonl",
+    parser.add_argument('--question_path', type=str, default="/projects/_ssd/ZhaoxuCode/Efficient-HA/opera_log/llava-1.5/greedy.jsonl",
                         help='Path to the question file')
-    parser.add_argument('--datapath', type=str, default="/projects/ChenqiDataSSD/ZXCode/val2014",
+    parser.add_argument('--datapath', type=str, default="/projects/_hdd/Datazx/coco_val_images/val2014/",
                         help='Path to the data')
-    parser.add_argument('--method', type=str, default="ours")
+    parser.add_argument('--method', type=str, default="saver")
     parser.add_argument("--cd_alpha", type=float, default=1)
     parser.add_argument("--cd_beta", type=float, default=0.1)
     parser.add_argument("--deco_alpha", type=float, default=0.6)
@@ -607,7 +642,7 @@ if __name__ == "__main__":
     parser.add_argument("--ours_a", type=float, default=1)
     parser.add_argument("--ours_b", type=float, default=1)
     parser.add_argument("--ours_c", type=float, default=1)
-    parser.add_argument("--ours_top_p", type=float, default=0.9)
+    parser.add_argument("--ours_top_p", type=float, default=10)
     parser.add_argument('--start_layer', type=int, default=18)
     parser.add_argument('--end_layer', type=int, default=26)
     parser.add_argument('--save_args', action='store_true', help='Whether to save args to a json file')
