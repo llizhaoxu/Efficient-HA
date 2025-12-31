@@ -391,6 +391,7 @@ class GenerationConfig(PushToHubMixin):
         self.ours_b=kwargs.pop("ours_b", None)
         self.ours_c=kwargs.pop("ours_c", None)
         self.ours_top_p=kwargs.pop("ours_top_p", None)
+        self.ours_margin=kwargs.pop("ours_margin", None)
         self.position=kwargs.pop("position", None)
         self.use_saver=kwargs.pop("use_saver", False)
         self.saver_threshold_top_k_small=kwargs.pop("saver_threshold_top_k_small", None)

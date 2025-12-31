@@ -173,7 +173,7 @@ def get_response(model, processor,args, image_path, question):
                 }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,ours_alpha=args.ours_alpha,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
-                    norm=norm, position=position)
+                    norm=norm, position=position,ours_margin=args.ours_margin)
         if args.method == "saver":
 
             position = {
@@ -416,7 +416,7 @@ def get_response(model, processor,args, image_path, question):
 
                 generation_config = dict(max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
-                    norm=norm,)
+                    norm=norm,ours_margin=args.ours_margin)
             elif args.method == "saver":
                 lm_head = model.language_model.lm_head
                 norm = model.language_model.model.norm
@@ -459,7 +459,7 @@ def get_response(model, processor,args, image_path, question):
                                     }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
-                    norm=norm, position=position)
+                    norm=norm, position=position,ours_margin=args.ours_margin)
         elif args.method == "saver":
 
             position = {
@@ -504,7 +504,7 @@ def get_response(model, processor,args, image_path, question):
             }
             outputs = model.generate(**inputs, max_new_tokens=args.max_tokens, do_sample=False, use_ours=True,threshold_top_p=args.deco_top_p, threshold_top_k=args.deco_top_k,ours_alpha=args.ours_alpha,ours_a=args.ours_a,ours_b=args.ours_b,ours_c=args.ours_c,ours_top_p=args.ours_top_p,
                                                 early_exit_layers=[i for i in range(args.start_layer,args.end_layer)], lm_head=lm_head,
-                    norm=norm, position=position)
+                    norm=norm, position=position,ours_margin=args.ours_margin)
         elif args.method == "saver":
             
             position = {
@@ -535,6 +535,7 @@ def get_response(model, processor,args, image_path, question):
         return output_text
 
     return output_text
+
 
 
 
@@ -603,6 +604,7 @@ if __name__ == "__main__":
     parser.add_argument("--ours_b", type=float, default=1)
     parser.add_argument("--ours_c", type=float, default=1)
     parser.add_argument("--ours_top_p", type=float, default=0.9)
+    parser.add_argument("--ours_margin", type=float, default=0.3)
     parser.add_argument('--start_layer', type=int, default=18)
     parser.add_argument('--end_layer', type=int, default=26)
     parser.add_argument('--save_args', action='store_true', help='Whether to save args to a json file')

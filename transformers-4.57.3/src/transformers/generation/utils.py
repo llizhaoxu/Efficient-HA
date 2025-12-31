@@ -2958,18 +2958,36 @@ class GenerationMixin(ContinuousMixin):
             mask = torch.zeros_like(score, dtype=bool)
             mask[early_exit_layers] = True
 
-            # 2. 选出 mask 对应的 tensor 部分
-            t_selected = score[mask]
+            t_selected = score[mask]  # [E]
 
-            # 3. 找出最小值及其在原 tensor 中的索引
+            # 正例：score最小的层
             min_val, min_pos = torch.min(t_selected, dim=0)
-            original_idx = early_exit_layers[min_pos] 
+            pos_idx = early_exit_layers[min_pos]
 
-            selected_premature_layer_logits = logits[
-                original_idx
-            ][
-                :, -1, :
-            ]  # [1, vocab_size]
+            # 负例：至少比min差 r%
+            r = generation_config.ours_margin  # 例如 0.3；你在config里加这个
+            thr = min_val * (1.0 + r)
+
+            cand = torch.nonzero(t_selected >= thr, as_tuple=False).squeeze(-1)
+
+            logits_pos = logits[pos_idx][:, -1, :]  # [1, V]
+
+            if cand.numel() == 0:
+                # 没有满足“相对差”的负例：不用contrastive（退化为原方案）
+                selected_premature_layer_logits = logits_pos
+            else:
+                # 选“刚好够差”的负例（最接近thr）
+                diff = t_selected[cand] - thr
+                neg_pos = cand[torch.argmin(diff)]
+                neg_idx = early_exit_layers[neg_pos]
+
+                logits_neg = logits[neg_idx][:, -1, :]  # [1, V]
+
+                # contrastive: log q_pos - log q_neg
+                selected_premature_layer_logits = (
+                    torch.log_softmax(logits_pos, dim=-1) - torch.log_softmax(logits_neg, dim=-1)
+                )  # [1, V]
+
             indices_to_remove = torch.ones_like(selected_premature_layer_logits)
             indices_to_remove[:, candidate_tokens_ids] = 0
             indices_to_remove = indices_to_remove.bool()
