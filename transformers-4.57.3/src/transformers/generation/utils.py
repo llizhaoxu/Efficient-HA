@@ -2814,12 +2814,12 @@ class GenerationMixin(ContinuousMixin):
             idx = torch.triu_indices(H, H, offset=1, device=attn_l.device)
             return js[idx[0], idx[1]].mean()
 
-        def topk_mean_pairwise_jsd(attn_l: torch.Tensor, k: int) -> torch.Tensor:
+        def topk_mean_pairwise_siou(attn_l: torch.Tensor, k: int) -> torch.Tensor:
             """
             attn_l: [H, N]   (某层所有 head 对 image tokens 的注意力)
-            k: 选多少个 head 再计算两两 JSD
-            
-            返回: 标量（Top-k head 之间的 mean pairwise JSD）
+            k: 选多少个 head 再计算两两 soft-IoU
+
+            返回: 标量（Top-k head 之间的 mean pairwise soft-IoU）
             """
             H, N = attn_l.shape
             if H <= 1:
@@ -2832,36 +2832,33 @@ class GenerationMixin(ContinuousMixin):
             strength = p.max(dim=-1).values  # [H]
 
             # ---- 2) 集中度（1 - normalized entropy）----
-            entropy = -(p * p.clamp_min(EPS).log()).sum(dim=-1)
-            entropy_norm = entropy / math.log(N + 1e-8)
-            compactness = 1.0 - entropy_norm  # [H]
+            entropy = -(p * p.clamp_min(EPS).log()).sum(dim=-1)          # [H]
+            entropy_norm = entropy / math.log(N + 1e-8)                  # [H]
+            compactness = 1.0 - entropy_norm                             # [H]
 
-            # ---- 3) soft-IoU（与所有 head 的平均 soft-IoU）----
-            #  Soft IoU = sum(min)/sum(max)
-            p_exp = p.unsqueeze(1)  # [H,1,N]
-            q_exp = p.unsqueeze(0)  # [1,H,N]
-            inter = torch.min(p_exp, q_exp).sum(dim=-1)     # [H,H]
-            union = torch.max(p_exp, q_exp).sum(dim=-1).clamp_min(EPS)  # [H,H]
-            sIoU = inter / union  # [H,H]
-
-            # 忽略自己和自己
-            idx = torch.arange(H, device=attn_l.device)
-            sIoU = sIoU.masked_fill(idx.unsqueeze(0) == idx.unsqueeze(1), 0.0)
-
-            # 平均 soft-IoU（衡量 head 与“主流 pattern”一致程度）
-            avg_sIoU = sIoU.sum(dim=-1) / (H - 1)  # [H]
-
-            # ---- 4) 综合得分（越大越好）----
-            score = strength + compactness + avg_sIoU
-
-            # ---- 5) 选 Top-k head ----
+            # ---- 3) 仅用 strength + compactness 选 Top-k ----
+            score = strength + compactness
             k_eff = min(k, H)
             _, topk_idx = torch.topk(score, k_eff)
-
             topk_attn = p[topk_idx]  # [k_eff, N]
 
-            # ---- 6) 在 Top-k head 间做 mean pairwise JSD ----
-            return mean_pairwise_jsd_over_heads(topk_attn)
+            # ---- 4) 在 Top-k head 间算 mean pairwise soft-IoU ----
+            if k_eff <= 1:
+                return attn_l.new_zeros(())
+
+            p_exp = topk_attn.unsqueeze(1)  # [k,1,N]
+            q_exp = topk_attn.unsqueeze(0)  # [1,k,N]
+            inter = torch.min(p_exp, q_exp).sum(dim=-1)                  # [k,k]
+            union = torch.max(p_exp, q_exp).sum(dim=-1).clamp_min(EPS)   # [k,k]
+            siou = inter / union                                         # [k,k]
+
+            # 去掉对角线（自己和自己）
+            idx = torch.arange(k_eff, device=attn_l.device)
+            siou = siou.masked_fill(idx.unsqueeze(0) == idx.unsqueeze(1), 0.0)
+
+            # mean over unordered pairs
+            pair_cnt = k_eff * (k_eff - 1)
+            return siou.sum() / pair_cnt
         prev_attn_LHN = None
         if model_kwargs.get("output_attentions") is not None:
             model_kwargs.pop("output_attentions")
@@ -2929,10 +2926,10 @@ class GenerationMixin(ContinuousMixin):
             interhead_jsd_L =torch.zeros(m, dtype=probs.dtype, device=probs.device)  # [layers]
             for l in range(1, m):
 
-                interhead_jsd_L[l] = topk_mean_pairwise_jsd(attn_LHN[l-1],k=top_p)
+                interhead_jsd_L[l] = topk_mean_pairwise_siou(attn_LHN[l-1],k=top_p)
                 js_d=js_divergence(probs[l], probs[l-1], dim=-1)
                 layer_jsd_mean[l] =js_d  # [1, T]
-
+            print(interhead_jsd_L)
             score= a*layer_jsd_mean +b* interhead_jsd_L + c*temporal_jsd_L
 
             if synced_gpus and this_peer_finished:
@@ -2960,34 +2957,39 @@ class GenerationMixin(ContinuousMixin):
 
             t_selected = score[mask]  # [E]
 
-            # 正例：score最小的层
+            # pos: score 最小（好）
             min_val, min_pos = torch.min(t_selected, dim=0)
             pos_idx = early_exit_layers[min_pos]
 
-            # 负例：至少比min差 r%
-            r = generation_config.ours_margin  # 例如 0.3；你在config里加这个
-            thr = min_val * (1.0 + r)
-
-            cand = torch.nonzero(t_selected >= thr, as_tuple=False).squeeze(-1)
+            # neg: score 最大（差）
+            max_val, max_pos = torch.max(t_selected, dim=0)
+            neg_idx = early_exit_layers[max_pos]
 
             logits_pos = logits[pos_idx][:, -1, :]  # [1, V]
+            # selected_premature_layer_logits = logits_pos
+            
 
-            if cand.numel() == 0:
-                # 没有满足“相对差”的负例：不用contrastive（退化为原方案）
+            
+            # version 1  set cutoff for Adaptive Plausibility Constraints
+            # probs = nn.functional.softmax(next_token_logits, dim=-1)
+            # cutoff = cd_beta * probs.max(dim=-1, keepdim=True).values
+
+            # version 2 set cutoff for Adaptive Plausibility Constraints
+            margin=generation_config.ours_margin
+            if int(neg_idx) == int(pos_idx):
                 selected_premature_layer_logits = logits_pos
             else:
-                # 选“刚好够差”的负例（最接近thr）
-                diff = t_selected[cand] - thr
-                neg_pos = cand[torch.argmin(diff)]
-                neg_idx = early_exit_layers[neg_pos]
+                selected_premature_layer_logits = (1+margin)*logits_pos - margin*logits[neg_idx][:, -1, :]  # [1, V]
 
-                logits_neg = logits[neg_idx][:, -1, :]  # [1, V]
-
-                # contrastive: log q_pos - log q_neg
-                selected_premature_layer_logits = (
-                    torch.log_softmax(logits_pos, dim=-1) - torch.log_softmax(logits_neg, dim=-1)
-                )  # [1, V]
-
+            # selected_premature_layer_logits = diffs.masked_fill(logits_pos < cutoff, -float("inf"))
+            # 如果无法形成对比（例如只有一个候选层），就不用contrastive
+            # if int(neg_idx) == int(pos_idx):
+            #     selected_premature_layer_logits = logits_pos
+            # else:
+            #     logits_neg = logits[neg_idx][:, -1, :]  # [1, V]
+            #     selected_premature_layer_logits = (
+            #         torch.log_softmax(logits_pos, dim=-1) - torch.log_softmax(logits_neg, dim=-1)
+            #     )  # [1, V]
             indices_to_remove = torch.ones_like(selected_premature_layer_logits)
             indices_to_remove[:, candidate_tokens_ids] = 0
             indices_to_remove = indices_to_remove.bool()
