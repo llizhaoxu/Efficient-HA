@@ -644,8 +644,8 @@ if __name__ == "__main__":
     parser.add_argument("--ours_c", type=float, default=1)
     parser.add_argument("--ours_top_p", type=float, default=10)
     parser.add_argument('--ours_margin', type=float, default=0.3)
-    parser.add_argument('--start_layer', type=int, default=18)
-    parser.add_argument('--end_layer', type=int, default=26)
+    parser.add_argument('--start_layer', type=int, default=20)
+    parser.add_argument('--end_layer', type=int, default=29)
     parser.add_argument('--save_args', action='store_true', help='Whether to save args to a json file')
     args = parser.parse_args()
 
