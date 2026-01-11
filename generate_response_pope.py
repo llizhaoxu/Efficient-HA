@@ -680,7 +680,8 @@ if __name__ == "__main__":
     parser.add_argument('--start_layer', type=int, default=20)
     parser.add_argument('--end_layer', type=int, default=29)
     parser.add_argument('--save_args', action='store_true', help='Whether to save args to a json file')
-
+    args = parser.parse_args()
+    
     if args.save_args:
         save_args_path = os.path.join(os.path.dirname(args.output),"{}_{}args.json".format(args.pope_type,args.method))
         if not os.path.exists(os.path.dirname(save_args_path)):
