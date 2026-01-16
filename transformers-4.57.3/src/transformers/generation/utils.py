@@ -2910,6 +2910,7 @@ class GenerationMixin(ContinuousMixin):
                 prev = prev_attn_LHN.view(L, -1)  # [L, H*img_len]
                 temporal_jsd_L = js_divergence(curr, prev, dim=-1)
                 temporal_jsd_L = torch.cat([torch.zeros(1, dtype=attn_LHN.dtype, device=attn_LHN.device), temporal_jsd_L], dim=0)  # [L+1] 
+                temporal_jsd_L=1-temporal_jsd_L
             prev_attn_LHN = attn_LHN.clone()
             last_layer_tokens_logits = outputs.logits[:, -1, :]
             
@@ -2929,7 +2930,18 @@ class GenerationMixin(ContinuousMixin):
                 interhead_jsd_L[l] = topk_mean_pairwise_siou(attn_LHN[l-1],k=top_p)
                 js_d=js_divergence(probs[l], probs[l-1], dim=-1)
                 layer_jsd_mean[l] =js_d  # [1, T]
-            print(interhead_jsd_L)
+            layer_jsd_mean=1-layer_jsd_mean
+            
+            # print("#######")
+            # print("layer_jsd_mean:", layer_jsd_mean
+            #       )
+            # print("interhead_jsd_L:", interhead_jsd_L
+                  
+            #     )
+            # print("temporal_jsd_L:", temporal_jsd_L
+                  
+            #     )
+            # print("#######")
             score= a*layer_jsd_mean +b* interhead_jsd_L + c*temporal_jsd_L
 
             if synced_gpus and this_peer_finished:
