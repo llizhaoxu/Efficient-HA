@@ -2969,13 +2969,13 @@ class GenerationMixin(ContinuousMixin):
 
             t_selected = score[mask]  # [E]
 
-            # pos: score 最小（好）
+            # neg: score 最小
             min_val, min_pos = torch.min(t_selected, dim=0)
-            pos_idx = early_exit_layers[min_pos]
+            neg_idx = early_exit_layers[min_pos]
 
-            # neg: score 最大（差）
+            # pos: score 最大
             max_val, max_pos = torch.max(t_selected, dim=0)
-            neg_idx = early_exit_layers[max_pos]
+            pos_idx = early_exit_layers[max_pos]
 
             logits_pos = logits[pos_idx][:, -1, :]  # [1, V]
             # selected_premature_layer_logits = logits_pos
