@@ -2918,7 +2918,7 @@ class GenerationMixin(ContinuousMixin):
             norm = norm
     
             logits = torch.stack(outputs.hidden_states)  # [layers, batch_size=1, hidden_size]
-            logits = lm_head(logits)
+            logits = lm_head(norm(logits))
             probs  = torch.softmax(logits[:, :, -1, :], dim=-1)# [layers, 1, vocab_size]
             T = probs.size(1)     # seq_len
             V = probs.size(2)     # vocab_size
